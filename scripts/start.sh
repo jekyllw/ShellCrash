@@ -49,6 +49,15 @@ getconfig() { #读取配置及全局变量
 	#检查$iptable命令可用性
 	ckcmd iptables && iptables -h | grep -q '\-w' && iptable='iptables -w' || iptable=iptables
 	ckcmd ip6tables && ip6tables -h | grep -q '\-w' && ip6table='ip6tables -w' || ip6table=ip6tables
+	#默认dns
+	[ -z "$dns_nameserver" ] && {
+		if [ -n "$(pidof dnsmasq)" ];then
+			dns_nameserver='127.0.0.1'
+		else
+			dns_nameserver='114.114.114.114, 223.5.5.5'
+		fi
+	}
+	[ -z "$dns_fallback" ] && dns_fallback='1.0.0.1, 8.8.4.4'
 }
 setconfig() { #脚本配置工具
 	#参数1代表变量名，参数2代表变量值,参数3即文件路径
@@ -129,10 +138,10 @@ logger() { #日志工具
 			webpush "$url" "$content" &
 		}
 		[ -n "$push_SynoChat" ] && {
-			# url="${push_ChatURL}"
-			# content="payload={\"text\":\"${log_text}\", \"user_ids\":[${push_ChatUSERID}]}"
-			# webpush "$url" "$content" &
-			curl -X POST "${push_ChatURL}/webapi/entry.cgi?api=SYNO.Chat.External&method=chatbot&version=2&token=${push_ChatTOKEN}" -H 'content-Type: application/json' -d "payload={\"text\":\"${log_text}\", \"user_ids\":[${push_ChatUSERID}]}" >/dev/null 2>&1
+			url="${push_ChatURL}/webapi/entry.cgi?api=SYNO.Chat.External&method=chatbot&version=2&token=${push_ChatTOKEN}"
+			content="payload={\"text\":\"${log_text}\", \"user_ids\":[${push_ChatUSERID}]}"
+			webpush "$url" "$content" &
+			#curl -X POST "${push_ChatURL}/webapi/entry.cgi?api=SYNO.Chat.External&method=chatbot&version=2&token=${push_ChatTOKEN}" -H 'content-Type: application/json' -d "payload={\"text\":\"${log_text}\", \"user_ids\":[${push_ChatUSERID}]}" >/dev/null 2>&1
 		}
 	} &
 }
@@ -225,7 +234,7 @@ getlanip() { #获取局域网host地址
 check_clash_config() { #检查clash配置文件
 	#检测节点或providers
 	sed -n "/^proxies:/,/^[a-z]/ { /^[a-z]/d; p; }" "$core_config_new" >"$TMPDIR"/proxies.yaml
-	if ! grep -Eq 'server:|server":' "$TMPDIR"/proxies.yaml && ! grep -q 'proxy-providers:' "$core_config_new"; then
+	if ! grep -Eq 'server:|server":|server'\'':' "$TMPDIR"/proxies.yaml && ! grep -q 'proxy-providers:' "$core_config_new"; then
 		echo -----------------------------------------------
 		logger "获取到了配置文件【$core_config_new】，但似乎并不包含正确的节点信息！" 31
 		cat "$TMPDIR"/proxies.yaml
@@ -359,8 +368,6 @@ get_core_config() { #下载内核配置文件
 }
 modify_yaml() { #修饰clash配置文件
 	##########需要变更的配置###########
-	[ -z "$dns_nameserver" ] && dns_nameserver='114.114.114.114, 223.5.5.5'
-	[ -z "$dns_fallback" ] && dns_fallback='1.0.0.1, 8.8.4.4'
 	[ -z "$skip_cert" ] && skip_cert=已开启
 	[ "$ipv6_dns" = "已开启" ] && dns_v6='true' || dns_v6='false'
 	external="external-controller: 0.0.0.0:$db_port"
@@ -524,7 +531,8 @@ EOF
 		mv -f "$TMPDIR"/rules.add "$TMPDIR"/rules.yaml
 	}
 	#mix模式生成rule-providers
-	[ "$dns_mod" = "mix" ] && ! grep -q 'geosite-cn' "$TMPDIR"/rule-providers.yaml && cat >>"$TMPDIR"/rule-providers.yaml <<EOF
+	[ "$dns_mod" = "mix" ] && ! grep -q 'geosite-cn:' "$TMPDIR"/rule-providers.yaml && ! grep -q 'rule-providers' "$CRASHDIR"/yamls/others.yaml 2>/dev/null && \
+	cat >>"$TMPDIR"/rule-providers.yaml <<EOF
   geosite-cn:
     type: file
     behavior: domain
@@ -1787,7 +1795,7 @@ bfstart() { #启动前
 	#检测网络连接
 	[ "$network_check" != "已禁用" ] && [ ! -f "$TMPDIR"/crash_start_time ] && ckcmd ping && network_check
 	[ ! -d "$BINDIR"/ui ] && mkdir -p "$BINDIR"/ui
-	[ -z "$crashcore" ] && crashcore=clash
+	[ -z "$crashcore" ] && crashcore=meta
 	#执行条件任务
 	[ -s "$CRASHDIR"/task/bfstart ] && . "$CRASHDIR"/task/bfstart
 	#检查内核配置文件
