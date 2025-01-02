@@ -767,6 +767,7 @@ EOF
 }
 EOF
 	if [ "$redir_mod" = "混合模式" -o "$redir_mod" = "Tun模式" ]; then
+		[ "ipv6_redir" = '已开启' ] && ipv6_address='"fdfe:dcba:9876::1/126",'
 		cat >>"$TMPDIR"/jsons/tun.json <<EOF
 {
   "inbounds": [
@@ -775,8 +776,8 @@ EOF
       "tag": "tun-in",
       "interface_name": "utun",
       "address": [
-        "172.72.0.1/30",
-        "fdfe:dcba:9876::1/126"
+        $ipv6_address
+        "172.72.0.1/30"
       ],
       "auto_route": false,
       "stack": "system",
@@ -1663,7 +1664,7 @@ makehtml() { #生成面板跳转文件
         <a href="https://board.zash.run.place" style="font-size: 24px;">zashboard面板<br></a>
         <a href="https://yacd.metacubex.one" style="font-size: 24px;">Meta YACD面板(推荐)<br></a>
         <a href="https://yacd.haishan.me" style="font-size: 24px;">Clash YACD面板<br></a>
-        <a style="font-size: 21px;"><br>如已安装，请刷新此页面！<br></a>
+        <a style="font-size: 21px;"><br>如已安装，请使用Ctrl+F5强制刷新此页面！<br></a>
     </div>
 </body>
 </html
